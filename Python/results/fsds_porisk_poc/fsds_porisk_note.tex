@@ -159,6 +159,59 @@ Discounting discards a history that is still valid, so discounted UCB is worse t
 Thompson sampling already concentrates on the unchanged arm.
 A small tax on top of it is the best rule in the grid: absolute \(\lambda=5\) has median \(0.90\) (gradual) and \(4.21\) (drastic), with Thompson at \(\eta=2\) close behind at \(1.16\) and \(4.36\).
 
+\section{How large the effect is}
+
+The median is a summary. The claim that the tax works has to survive two stricter checks: it has to appear on each pool, and the gap has to be larger than the seed standard deviation of either rule. Table~\ref{tab:effect:reloc} and Table~\ref{tab:effect:clear} are those checks. Every raw mean, for every rule and every pool, is in the appendix.
+
+\paragraph{Gradual relocation is the clean effect.}
+UCB at \(\eta=2\) cuts the post-shift excess on all six pools, by \(46\%\) to \(65\%\):
+Gaussian \(d=30\) from \(50.6\) to \(25.1\),
+Gaussian \(d=12\) from \(22.9\) to \(10.3\),
+Student-\(t_5\) from \(46.3\) to \(25.0\),
+AR(1) from \(18.2\) to \(8.8\),
+California housing from \(4.2\) to \(1.5\),
+Covertype from \(73.1\) to \(31.2\).
+On each pool the gap exceeds the larger seed standard deviation, and the taxed seed standard deviation is itself smaller (Covertype falls from \(20.7\) to \(1.2\)).
+Against discounted UCB the same gap clears the seed noise on five pools.
+California is the exception: discounting alone is already \(1.65\) with seed sd \(1.50\), and the tax moves the point estimate to \(1.49\).
+That pool has only eight columns, so the two blocks are short and the share separates more slowly.
+Against \(\varepsilon=0.10\) the removed fraction is \(85\%\) to \(92\%\) on every pool, and the gap is several times the seed noise.
+
+The hit rate explains what kind of improvement this is.
+On the four large synthetic pools, UCB's post-shift hit rate is about \(0.38\) to \(0.44\), and the taxed rule is about \(0.47\) to \(0.51\).
+Excess falls by half while the fraction of rounds on the unique best card rises by only about ten points.
+The tax is not finding a hidden optimum on every round.
+It is refusing the stale card and the zero card.
+The blend, which is close to the fresh block during the ramp, absorbs many of the remaining rounds, so the excess of those rounds is small.
+Epsilon-greedy's hit rate on the same pools is about \(0.03\).
+It almost never serves the best card after the shift, which is why its excess is \(57\) to \(217\).
+
+The early window, mixing weight exactly zero, does not pay for this.
+UCB and UCB at \(\eta=2\) have the same early total on Gaussian \(d=30\) (\(23.5\)), Gaussian \(d=12\) (\(10.4\)), Student-\(t_5\) (\(21.8\)), and Covertype (\(27.3\)).
+AR(1) moves from \(8.95\) to \(8.43\), and California from \(7.06\) to \(6.62\).
+Epsilon at \(10\%\) is already higher on five of the six pools before anything moves.
+
+\paragraph{Where the same bar is cleared, and where it is not.}
+Table~\ref{tab:effect:clear} counts a pool only when the candidate beats the baseline by more than the larger seed standard deviation.
+Growing noise, with Thompson at \(\eta=2\), clears UCB on all six gradual pools and discounted UCB on all six.
+The best card never changed, the share stays on the irrelevant scores, and the tax is a small push on top of a posterior that was already in the right place.
+A drastic relocation clears UCB on five pools and discounted UCB on none.
+The share still points at the stale block, and that is enough to beat a rule that keeps the whole history.
+It is not enough to beat a rule that is already forgetting that history.
+A sign flip clears nobody who matters.
+Taxed UCB is worse than plain UCB on every pool, and on a drastic flip it is also worse than \(\varepsilon=0.10\) on every pool.
+The negative gaps are larger than the seed noise: Gaussian \(d=30\) goes from \(508\) to \(916\), Covertype from \(648\) to \(1172\).
+This is the tax removing the zero hedge, and it is repeatable.
+
+A dying block and a nonlinear add-on sit between these.
+Discounted UCB with a modest tax has the best median, but the per-pool gap over discounting alone often sits inside the seed noise.
+The reliable piece is the comparison with UCB and with epsilon-greedy on the pools where the linear signal is large.
+Gaussian \(d=12\) is the instructive small case for a dying block: plain UCB's post-shift excess is already about \(2\), and the tax cannot improve a problem that was almost solved.
+California's nonlinear add-on is not evidence either way.
+One squared housing coordinate makes the excess and the seed sd both enormous, which is why the headline number is a median.
+
+\input{effect_tables.tex}
+
 \section{Why epsilon-greedy loses at this batch size}
 
 Epsilon-greedy buys robustness by spending a fixed fraction of every batch on a uniform draw.
