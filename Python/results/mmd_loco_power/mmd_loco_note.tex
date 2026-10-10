@@ -1,0 +1,51 @@
+\documentclass{article}
+\usepackage{booktabs,geometry,graphicx,amsmath}
+\geometry{margin=1in}
+\title{A side check: MMD-LOCO against vanilla MMD\\on a covariate shift}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+This note is not the FSDS horse-race. It only asks whether the leave-one-coordinate
+MMD scores, turned into a single permutation statistic, detect a mean shift in $X$
+more often than the joint MMD on the same kernel.
+
+The kernel is $\exp(-\gamma\|x-y\|^2)$ with $\gamma$ equal to one over the median
+pooled squared distance. $\gamma$ is computed once on the observed pool and held
+fixed. Dropping coordinate $j$ subtracts that coordinate's squared differences from
+the three distance matrices, which is the joint kernel on the remaining coordinates
+at the same $\gamma$. The vector of interest is $\mathrm{MMD}^2-\mathrm{MMD}^2_{-j}$.
+Two scalars are tested: the maximum coordinate, and the sum of the positive coordinates.
+The baseline is the unbiased $\mathrm{MMD}^2$ itself. A normalized version,
+$\mathrm{NAMMD}^2=\mathrm{MMD}^2_u/\sqrt{\bar k_{xx}\bar k_{yy}}$, is carried along
+because the same drop applies to it. Each test uses the same label permutations.
+The $p$-value is $(1+\#\{T_b\ge T\}) / (B+1)$.
+
+Each batch has $n=120$ reference rows and $n$ new rows. Coordinates are standard
+normal, independent in the main grid, with an AR(1) check beside it. The new batch
+adds a constant to the first $s$ coordinates. $B=199$ permutations and
+$80$ Monte Carlo replicates. The dashed line in the figure is $\alpha=0.05$.
+ECMMD is omitted: it needs a response and is a conditional discrepancy, not a test of $P(X)$.
+
+On one shifted coordinate the maximum is the more sensitive of the two.
+At $p=50$ and shift $0.60$, max LOCO rejects in $0.95$ of the $80$ replicates
+and vanilla MMD in $0.65$; $25$ replicates are rejected only by the maximum
+and $1$ only by MMD. At $p=20$ and shift $0.50$ the rates are $0.85$ and $0.60$
+($22$ only by the maximum, $2$ only by MMD).
+A shift in every coordinate reverses this. At $p=50$ and shift $0.10$,
+vanilla MMD rejects in $0.81$ and the maximum in $0.19$
+($50$ replicates only by MMD). The sum of the positive coordinates stays nearer
+the joint statistic on that dense shift ($0.65$) than the maximum does.
+Null rejection across the grid sits between $0$ and $0.11$.
+
+\input{power_table.tex}
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\textwidth]{power.png}
+\caption{Independent-coordinate grid. Curves are rejection rates. Bands are
+pointwise $1.96$ Monte Carlo standard errors. The horizontal line is $0.05$.}
+\end{figure}
+
+\end{document}
