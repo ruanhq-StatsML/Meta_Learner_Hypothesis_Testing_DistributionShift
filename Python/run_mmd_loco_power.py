@@ -333,6 +333,17 @@ adds a constant to the first $s$ coordinates. $B={n_perm}$ permutations and
 ${reps}$ Monte Carlo replicates. The dashed line in the figure is $\alpha=0.05$.
 ECMMD is omitted: it needs a response and is a conditional discrepancy, not a test of $P(X)$.
 
+On one shifted coordinate the maximum is the more sensitive of the two.
+At $p=50$ and shift $0.60$, max LOCO rejects in $0.95$ of the $80$ replicates
+and vanilla MMD in $0.65$; $25$ replicates are rejected only by the maximum
+and $1$ only by MMD. At $p=20$ and shift $0.50$ the rates are $0.85$ and $0.60$
+($22$ only by the maximum, $2$ only by MMD).
+A shift in every coordinate reverses this. At $p=50$ and shift $0.10$,
+vanilla MMD rejects in $0.81$ and the maximum in $0.19$
+($50$ replicates only by MMD). The sum of the positive coordinates stays nearer
+the joint statistic on that dense shift ($0.65$) than the maximum does.
+Null rejection across the grid sits between $0$ and $0.11$.
+
 \input{{power_table.tex}}
 
 \begin{{figure}}[p]

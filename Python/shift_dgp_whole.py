@@ -260,15 +260,16 @@ def generate_all_dgp(configs: list[DGPConfig]) -> tuple[list[DGPOutput], pd.Data
     return outputs, metadata_df
 
 
-configs = make_whole_DGP()
-outputs, metadata_df = generate_all_dgp(configs)
-np.save(
-    "DGP_whole_outputs_onesided.npy",
-    np.array(outputs, dtype=object),
-    allow_pickle=True,
-)
-metadata_df.to_csv("DGP_whole_meta_onesided.csv", index=False)
-print(f"wrote results/DGP_whole_outputs.npy ({len(outputs)} configs)")
-print(f"wrote results/DGP_whole_meta.csv shape={metadata_df.shape}")
+if __name__ == "__main__":
+    configs = make_whole_DGP()
+    outputs, metadata_df = generate_all_dgp(configs)
+    np.save(
+        "DGP_whole_outputs_onesided.npy",
+        np.array(outputs, dtype=object),
+        allow_pickle=True,
+    )
+    metadata_df.to_csv("DGP_whole_meta_onesided.csv", index=False)
+    print(f"wrote DGP_whole_outputs_onesided.npy ({len(outputs)} configs)")
+    print(f"wrote DGP_whole_meta_onesided.csv shape={metadata_df.shape}")
 
 

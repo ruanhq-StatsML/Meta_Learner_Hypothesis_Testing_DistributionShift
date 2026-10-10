@@ -64,6 +64,23 @@ def _kernel_terms(Kxx: np.ndarray, Kyy: np.ndarray, Kxy: np.ndarray):
     return mmd, mmd / scale
 
 
+def unbiased_mmd2(X_ref: np.ndarray, X_new: np.ndarray, gamma: float) -> float:
+    """Gretton unbiased MMD^2. The cross term is divided by n*m.
+
+    The uploaded ``kernel_MMD`` cites the same paper but leaves the cross term
+    as a raw sum, which at these sample sizes swamps the two within-sample
+    terms. The comparisons use this U-statistic.
+    """
+    X_ref = np.asarray(X_ref, dtype=np.float32)
+    X_new = np.asarray(X_new, dtype=np.float32)
+    gamma = np.float32(gamma)
+    Kxx = np.exp(-gamma * pairwise_sq_distances(X_ref, X_ref))
+    Kyy = np.exp(-gamma * pairwise_sq_distances(X_new, X_new))
+    Kxy = np.exp(-gamma * pairwise_sq_distances(X_ref, X_new))
+    mmd, _ = _kernel_terms(Kxx, Kyy, Kxy)
+    return float(mmd)
+
+
 def mmd_and_loco(X_ref: np.ndarray, X_new: np.ndarray, gamma: float):
     """Joint scores and the leave-one-coordinate drops.
 
