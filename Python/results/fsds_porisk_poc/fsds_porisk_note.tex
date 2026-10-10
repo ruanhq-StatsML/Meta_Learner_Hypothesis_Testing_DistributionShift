@@ -1,0 +1,376 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{caption}
+\captionsetup{font=small,skip=6pt}
+
+\title{Screening deployed arms by pseudo-outcome risk share\\
+\large A large-batch proof of concept}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{What was run}
+
+Four fixed linear scorecards compete on successive batches.
+The reward is negative batch mean squared error.
+Excess on a round is the gap between the served scorecard and the best scorecard on that batch.
+The FSDS weight of scorecard \(k\) is the held-out residual variance of its doubly robust pseudo-outcome, divided by the sum of those residuals across the four scorecards.
+The pseudo-outcome compares a fixed reference window (the first six batches) with the latest six batches.
+The share is refreshed every eight rounds from round 16.
+It is computed from every scorecard's prediction on the logged batch, so it does not require that the scorecard was served.
+
+The index is the usual UCB, discounted UCB, or Thompson draw, minus a tax \(\eta\sigma w_k\).
+Here \(\sigma\) is the standard deviation of the four arm rewards on the reference window, and \(\eta\in\{0.5,1,2\}\).
+An absolute penalty \(\lambda=5\), not scaled by \(\sigma\), is reported as a check.
+No rule uses \(\lambda=20\) or \(\lambda=40\).
+Epsilon-greedy at \(5\%\), \(10\%\), and \(15\%\) is the uniform-exploration comparator, and one extra rule puts the \(\eta=1\) tax on the \(10\%\) rule.
+
+Each batch has \(200\) rows.
+There are \(80\) rounds.
+A gradual path holds the mixing weight at \(0\) through round \(20\) and then ramps to \(1\).
+A drastic path jumps at round \(40\).
+Post-shift totals use rounds whose mixing weight is at least \(1/2\).
+Early totals use rounds whose mixing weight is exactly \(0\).
+The ramp in between is reported separately.
+Four seeds, \(20261018\) through \(20261021\), are averaged.
+Parentheses in the tables are the seed standard deviation.
+
+The covariate pools all have at least \(10{,}000\) rows, or are synthetic of that size.
+Columns are standardized.
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Pool & Rows used & Columns \\
+\midrule
+Gaussian & \(20{,}000\) & \(30\) \\
+Gaussian & \(20{,}000\) & \(12\) \\
+Student-\(t_5\) & \(20{,}000\) & \(30\) \\
+AR(1) Gaussian, correlation \(0.6\) & \(20{,}000\) & \(30\) \\
+California housing & \(20{,}640\) & \(8\) \\
+Covertype, draw from \(581{,}012\) & \(30{,}000\) & \(54\) \\
+\bottomrule
+\end{tabular}
+\end{center}
+Real matrices supply covariates only.
+The label is the synthetic shift: relocation of a linear block, a sign flip, a dying block, a nonlinear add-on, or growing noise.
+The headline number below is the median, across the six pools, of the four-seed mean.
+California's nonlinear add-on produces a very large squared term, so a raw mean would follow that one pool.
+
+A second horse-race replaces scorecards by four linear policies on a horizon of four steps, with \(200\) episodes in each round.
+The same residual share is computed from each policy's scalar self-score.
+Three monitors are compared: an oracle that sees every policy's return, an on-policy log of the served policy only, and a least-squares reward fit that imagines the unserved policies.
+
+\section{What the share is doing}
+
+On a gradual relocation the share does not chase the scorecard whose predictions move the most.
+It chases the scorecard that has stopped explaining the outcome.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/shares_gradual_relocate.png}
+\caption{PO-risk shares on a gradual relocation.
+Before the ramp, the fresh block and the zero score hold the mass, and the stale block, which still carries the signal, sits near zero.
+After the mixing weight passes \(1/2\) (dashed line), the fresh share falls and the stale share rises to meet the zero score.
+The same crossing appears on all six pools.
+California, with only eight columns, separates more slowly.}
+\end{figure}
+
+Before the move, \(y\) is the stale block.
+A regression of the pseudo-outcome on that score absorbs the contrast, so its residual share is small.
+The fresh block is orthogonal to \(y\), and the zero score has nothing to project onto, so those two residuals take the share.
+After the move, \(y\) lives on the fresh block.
+The fresh residual collapses and the stale residual inflates, because the current-window leftover is now orthogonal to the stale score.
+The zero score never explains \(y\), so it keeps a large share throughout.
+Post-shift means on the Gaussian \(d=30\) pool are about \(0.35\) on the stale block, \(0.11\) on the fresh block, \(0.09\) on the blend, and \(0.45\) on zero.
+Covertype is sharper: about \(0.34\), \(0.09\), \(0.08\), and \(0.49\).
+
+The tax \(-\eta\sigma w_k\) is therefore a screen on currently unexplained scores.
+An arm that moves with the world sheds the tax.
+An arm that moves against the world, or that never carried the signal, keeps it.
+That is why a penalty on the raw change in the arm's own prediction would be the wrong instrument: the fresh card's fitted mean moves the most, and that movement is the signal.
+
+While the mixing weight is still zero, UCB and UCB with \(\eta\in\{1,2\}\) have the same early excess (median \(16.1\) on gradual relocation).
+The relevant arm already wins the reward index, and the tax on the irrelevant arms does not change the argmax.
+Epsilon-greedy pays immediately: its early median is \(19.9\) at \(10\%\).
+
+\section{Where the tax earns its keep}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/cum_gradual_relocate.png}
+\caption{Cumulative excess on a gradual relocation.
+UCB with \(\eta=1\) or \(2\) stays flat after the dashed line.
+Epsilon-greedy at \(10\%\), with or without the tax, keeps accumulating.
+Thompson sampling without the tax tracks the exploring rules; with \(\eta=1\) it moves toward UCB.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/eta_profile.png}
+\caption{Median post-shift excess against the scale \(\eta\).
+The dashed line is epsilon-greedy at \(10\%\).
+Relocation, a dying block, and a nonlinear add-on slope down for UCB.
+A sign flip slopes up: the tax is the wrong sensor there.
+Noise growth is already small for Thompson sampling, and discounting sits above UCB because the best card never changes.}
+\end{figure}
+
+Three regimes show up on every pool.
+
+\paragraph{The signal changes subspace.}
+Gradual relocation, the nonlinear add-on, and a dying block are this case.
+The median post-shift excess on gradual relocation is \(34.6\) for UCB, \(24.6\) for discounted UCB, \(80.0\) for Thompson sampling, and \(125.0\) for epsilon-greedy at \(10\%\).
+UCB with \(\eta=2\) and discounted UCB with \(\eta=2\) both sit at \(17.6\).
+That removes \(49\%\) of the UCB total and \(86\%\) of the epsilon-greedy total, and it is lower than discounting alone on all six pools.
+The same ordering holds at \(\eta=1\) (\(17.8\)).
+Epsilon at \(5\%\) is still \(100.6\), and epsilon at \(15\%\) is \(82.6\): a larger uniform share spends more whole batches on a wrong scorecard and does not locate the fresh block any faster.
+On the nonlinear add-on the best median is discounted UCB at \(\eta=2\), \(2.80\), against \(8.48\) for UCB and \(21.9\) for epsilon at \(10\%\).
+On a gradual death the same rule is \(27.1\), against \(41.6\) for discounting alone and \(52.2\) for UCB.
+
+A drastic relocation is the boundary inside this regime.
+Plain discounted UCB is best, at \(107.7\).
+Adding \(\eta=1\) moves it to \(111.1\), and \(\eta=2\) to \(115.5\).
+The share still separates (fresh near \(0.09\), stale near \(0.32\)), and the tax still beats plain UCB (\(166.3\) to \(134.6\) at \(\eta=2\)).
+Once the index is already discounting, a jump of this size is carried by the reward, and the extra tax does not pay.
+
+\paragraph{The signal flips sign.}
+A within-window least squares absorbs the sign into the two window-specific slopes.
+The residual then cannot prefer the flipped card.
+On a drastic flip the two signed scores each hold about \(0.03\) of the share and the zero score holds about \(0.90\).
+They are tied, so the tax has nothing to say about which sign is current.
+What it does say is to avoid zero.
+After the flip, predicting zero is the hedge: its mean squared error is on the order of the signal variance, while predicting the wrong sign is on the order of four times that variance.
+UCB without the tax retreats toward zero.
+UCB with \(\eta=1\) is forbidden from that retreat and stays on the stale sign.
+The median post-shift excess goes from \(351\) for UCB and \(235\) for discounted UCB to \(613\) for UCB at \(\eta=1\), and from \(235\) to \(431\) for discounted UCB at \(\eta=1\).
+The shut-off is visible in the share itself, before any regret is computed.
+If one null score holds most of the mass and the remaining scores are tied, set \(\eta=0\) and discount the reward.
+Discounting wins both the gradual flip (\(99.2\)) and the drastic flip (\(234.6\)).
+It wins by hedging toward zero, not by discovering the flipped card: that card's pre-flip mean is terrible and it is almost never pulled.
+
+\paragraph{Only the noise scale changes.}
+The linear score stays correct, and its share stays small, about \(0.10\) to \(0.18\).
+The tax lands on zero and on the irrelevant block.
+Discounting discards a history that is still valid, so discounted UCB is worse than UCB (\(7.28\) against \(3.97\) on the gradual path, \(11.3\) against \(5.37\) on the drastic path).
+Thompson sampling already concentrates on the unchanged arm.
+A small tax on top of it is the best rule in the grid: absolute \(\lambda=5\) has median \(0.90\) (gradual) and \(4.21\) (drastic), with Thompson at \(\eta=2\) close behind at \(1.16\) and \(4.36\).
+
+\section{How large the effect is}
+
+The median is a summary. The claim that the tax works has to survive two stricter checks: it has to appear on each pool, and the gap has to be larger than the seed standard deviation of either rule. Table~\ref{tab:effect:reloc} and Table~\ref{tab:effect:clear} are those checks. Every raw mean, for every rule and every pool, is in the appendix.
+
+\paragraph{Gradual relocation is the clean effect.}
+UCB at \(\eta=2\) cuts the post-shift excess on all six pools, by \(46\%\) to \(65\%\):
+Gaussian \(d=30\) from \(50.6\) to \(25.1\),
+Gaussian \(d=12\) from \(22.9\) to \(10.3\),
+Student-\(t_5\) from \(46.3\) to \(25.0\),
+AR(1) from \(18.2\) to \(8.8\),
+California housing from \(4.2\) to \(1.5\),
+Covertype from \(73.1\) to \(31.2\).
+On each pool the gap exceeds the larger seed standard deviation, and the taxed seed standard deviation is itself smaller (Covertype falls from \(20.7\) to \(1.2\)).
+Against discounted UCB the same gap clears the seed noise on five pools.
+California is the exception: discounting alone is already \(1.65\) with seed sd \(1.50\), and the tax moves the point estimate to \(1.49\).
+That pool has only eight columns, so the two blocks are short and the share separates more slowly.
+Against \(\varepsilon=0.10\) the removed fraction is \(85\%\) to \(92\%\) on every pool, and the gap is several times the seed noise.
+
+The hit rate explains what kind of improvement this is.
+On the four large synthetic pools, UCB's post-shift hit rate is about \(0.38\) to \(0.44\), and the taxed rule is about \(0.47\) to \(0.51\).
+Excess falls by half while the fraction of rounds on the unique best card rises by only about ten points.
+The tax is not finding a hidden optimum on every round.
+It is refusing the stale card and the zero card.
+The blend, which is close to the fresh block during the ramp, absorbs many of the remaining rounds, so the excess of those rounds is small.
+Epsilon-greedy's hit rate on the same pools is about \(0.03\).
+It almost never serves the best card after the shift, which is why its excess is \(57\) to \(217\).
+
+The early window, mixing weight exactly zero, does not pay for this.
+UCB and UCB at \(\eta=2\) have the same early total on Gaussian \(d=30\) (\(23.5\)), Gaussian \(d=12\) (\(10.4\)), Student-\(t_5\) (\(21.8\)), and Covertype (\(27.3\)).
+AR(1) moves from \(8.95\) to \(8.43\), and California from \(7.06\) to \(6.62\).
+Epsilon at \(10\%\) is already higher on five of the six pools before anything moves.
+
+\paragraph{Where the same bar is cleared, and where it is not.}
+Table~\ref{tab:effect:clear} counts a pool only when the candidate beats the baseline by more than the larger seed standard deviation.
+Growing noise, with Thompson at \(\eta=2\), clears UCB on all six gradual pools and discounted UCB on all six.
+The best card never changed, the share stays on the irrelevant scores, and the tax is a small push on top of a posterior that was already in the right place.
+A drastic relocation clears UCB on five pools and discounted UCB on none.
+The share still points at the stale block, and that is enough to beat a rule that keeps the whole history.
+It is not enough to beat a rule that is already forgetting that history.
+A sign flip clears nobody who matters.
+Taxed UCB is worse than plain UCB on every pool, and on a drastic flip it is also worse than \(\varepsilon=0.10\) on every pool.
+The negative gaps are larger than the seed noise: Gaussian \(d=30\) goes from \(508\) to \(916\), Covertype from \(648\) to \(1172\).
+This is the tax removing the zero hedge, and it is repeatable.
+
+A dying block and a nonlinear add-on sit between these.
+Discounted UCB with a modest tax has the best median, but the per-pool gap over discounting alone often sits inside the seed noise.
+The reliable piece is the comparison with UCB and with epsilon-greedy on the pools where the linear signal is large.
+Gaussian \(d=12\) is the instructive small case for a dying block: plain UCB's post-shift excess is already about \(2\), and the tax cannot improve a problem that was almost solved.
+California's nonlinear add-on is not evidence either way.
+One squared housing coordinate makes the excess and the seed sd both enormous, which is why the headline number is a median.
+
+\input{effect_tables.tex}
+
+\section{Why epsilon-greedy loses at this batch size}
+
+Epsilon-greedy buys robustness by spending a fixed fraction of every batch on a uniform draw.
+That price is proportional to the batch size times the gap between a random scorecard and the best one.
+At \(200\) rows the gap is paid in full on each exploratory round, before the shift and after it.
+On gradual relocation the post-shift median rises from \(101\) at \(5\%\) to \(125\) at \(10\%\), and the \(15\%\) rule is \(83\) only because a few seeds stumbled onto the fresh block, not because the explore rate is well tuned.
+None of the three is close to UCB, and putting the \(\eta=1\) tax on the \(10\%\) rule only brings the median from \(125\) to \(72.5\).
+The uniform draws still fire after the share has already identified the stale block.
+
+This does not contradict the small-batch finding that a few percent of exploration is useful when nothing else is watching the environment.
+Here something else is watching.
+The share is computed from logged predictions of every deployed score, on a window of \(1{,}200\) rows, and it does not consume a served batch.
+Uniform traffic is then the expensive sensor, and the residual share is the cheap one.
+The stationary period already shows the toll: epsilon at \(10\%\) has higher early excess on every family, while the tax does not.
+
+The scale of the tax matters as much as its presence.
+\(\eta\sigma w_k\) is in reward units.
+A full share at \(\eta=1\) is one reference-window standard deviation, which nudges the index without erasing it.
+Absolute \(\lambda=5\) matches that nudge on the Gaussian relocation, where \(\sigma\) is a few units, and it is too small on the California nonlinear add-on, where the same \(\lambda=5\) stays next to untaxed UCB while the scaled tax drops the excess.
+One \(\eta\) travels across the six pools.
+One raw \(\lambda\) does not.
+Values \(\eta>2\) are not needed for the subspace moves, and they are actively harmful on a sign flip, which is the reason the grid stops at \(2\).
+
+\section{The same share on policies}
+
+Four linear policies, one per feature block plus a zero policy, run for four steps.
+The environment coefficient drifts from the first block to the second, and in the double path onward to the third.
+The scalar score of a policy is the return it would earn if the world matched its own coefficient.
+The residual of that score is again the share.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/policy_bar_single.png}
+\caption{Single block move.
+Phase 0, before the new block has majority weight, is essentially tied for every rule except epsilon-greedy.
+Phase 1 median excess return is \(7.1\) for UCB at \(\eta=2\), \(16.0\) for discounted UCB, \(16.2\) for the fitted monitor at \(\eta=1\), \(32.0\) for plain UCB, and \(54.4\) for epsilon-greedy at \(10\%\).}
+\end{figure}
+
+Phase 0 is unaffected by the tax, as in the scorecard experiment.
+After the move, UCB at \(\eta=2\) is the lowest median on all six pools in the single-shift path, and it is below discounted UCB.
+Thompson sampling needs the larger tax: at \(\eta=2\) its phase-1 median falls from \(49.6\) to \(22.6\), still above discounted UCB.
+Epsilon-greedy remains the most expensive rule in both phases.
+
+The monitor is the practical question.
+The oracle share uses every policy's realized return.
+The fitted monitor does not.
+It fits the reward coefficient by least squares on the transitions of the served policy, imagines every policy's return under that fit, and only then computes the residual share.
+On the single move, UCB at \(\eta=1\) with the fitted monitor has median phase-1 excess \(16.2\), the same as the oracle tax at \(\eta=1\) and the same as discounted UCB.
+On the second move of the double path the fitted monitor stays with the oracle: phase-2 medians are \(11.0\) for oracle UCB at \(\eta=2\), \(14.6\) for the fitted monitor at \(\eta=1\), \(16.4\) for discounted UCB, and \(42.6\) for plain UCB.
+The on-policy monitor, which assigns residual \(1\) to any policy missing from a window, does not survive the second move.
+Its phase-2 median is \(96\), worse than plain UCB.
+A policy that was not served in the last four rounds is not a high-residual policy.
+Treating missingness as risk taxes the arm one most needs to inspect.
+
+So the deployable version of this horse-race is not ``log only what you served.''
+It is ``fit the reward on what you served, imagine the other policies, and put the residual share on a discounted or undiscounted UCB index, with \(\eta\) at \(1\) or \(2\).''
+Turn the tax off when the share collapses onto a single null score and the live scores are tied.
+That pattern is the sign-flip failure, and it is readable from the weights alone.
+
+\section{Operating summary}
+
+\begin{center}
+\begin{tabular}{p{0.30\textwidth}p{0.62\textwidth}}
+\toprule
+What the share does & Screen the score that no longer explains the batch. Release the score the batch has moved onto. \\
+Relocation, gradual & UCB or discounted UCB at \(\eta=2\). Median post excess \(17.6\), against \(34.6\), \(24.6\), and \(125\) for UCB, discounted UCB, and \(\varepsilon=0.10\). \\
+Relocation, drastic & Discounted UCB, tax off or very small. Median \(107.7\). The tax still beats plain UCB. \\
+Dying block, nonlinear add-on & Discounted UCB at \(\eta=1\) or \(2\). Best medians \(27.1\), \(35.8\), \(2.80\), \(5.12\). \\
+Sign flip & Tax off. Discount the reward. The share piles onto the zero score and the tax removes the hedge. \\
+Noise growth & Thompson sampling, with a small tax. Do not discount. The best card did not change. \\
+Before any shift & The tax is inert. Epsilon-greedy is not. \\
+Policies & Same rule. Imagine unserved policies from a reward fit. Do not impute a residual of \(1\) for a policy you did not serve. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Batch size \(200\) and pools of at least \(10{,}000\) rows are what make the comparison sharp.
+The pseudo-outcome is estimated on \(1{,}200\) rows in each window, and an exploratory batch is too expensive to spend uniformly once that estimate is available.
+
+\appendix
+\section{Figures}
+\graphicspath{{figures/}}
+
+\subsection{Cumulative excess}
+\newcommand{\cumfig}[2]{%
+\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{figures/cum_#1.png}
+\caption{Cumulative excess MSE, #2. Mean across four seeds, band is the seed standard deviation. The dashed line is the first round with mixing weight at least \(1/2\).}
+\end{figure}\clearpage}
+\cumfig{gradual_relocate}{gradual relocation}
+\cumfig{drastic_relocate}{drastic relocation}
+\cumfig{gradual_flip}{gradual sign flip}
+\cumfig{drastic_flip}{drastic sign flip}
+\cumfig{gradual_die}{gradual dying block}
+\cumfig{drastic_die}{drastic dying block}
+\cumfig{gradual_nonlin}{gradual nonlinear add-on}
+\cumfig{drastic_nonlin}{drastic nonlinear add-on}
+\cumfig{gradual_noise}{gradual noise growth}
+\cumfig{drastic_noise}{drastic noise growth}
+
+\subsection{PO-risk shares}
+\newcommand{\sharefig}[2]{%
+\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{figures/shares_#1.png}
+\caption{PO-risk shares, #2. Mean across four seeds.}
+\end{figure}\clearpage}
+\sharefig{gradual_relocate}{gradual relocation}
+\sharefig{drastic_relocate}{drastic relocation}
+\sharefig{gradual_flip}{gradual sign flip}
+\sharefig{drastic_flip}{drastic sign flip}
+\sharefig{gradual_die}{gradual dying block}
+\sharefig{drastic_die}{drastic dying block}
+\sharefig{gradual_nonlin}{gradual nonlinear add-on}
+\sharefig{drastic_nonlin}{drastic nonlinear add-on}
+\sharefig{gradual_noise}{gradual noise growth}
+\sharefig{drastic_noise}{drastic noise growth}
+
+\subsection{Median rankings and the scale profile}
+\newcommand{\barfig}[2]{%
+\begin{figure}[p]\centering
+\includegraphics[width=0.78\textwidth]{figures/bar_#1.png}
+\caption{Median post-shift excess across the six pools, #2. Lower is better.}
+\end{figure}\clearpage}
+\barfig{gradual_relocate}{gradual relocation}
+\barfig{drastic_relocate}{drastic relocation}
+\barfig{gradual_flip}{gradual sign flip}
+\barfig{drastic_flip}{drastic sign flip}
+\barfig{gradual_die}{gradual dying block}
+\barfig{drastic_die}{drastic dying block}
+\barfig{gradual_nonlin}{gradual nonlinear add-on}
+\barfig{drastic_nonlin}{drastic nonlinear add-on}
+\barfig{gradual_noise}{gradual noise growth}
+\barfig{drastic_noise}{drastic noise growth}
+
+\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{figures/eta_profile.png}
+\caption{Post-shift excess against \(\eta\), median across pools.}
+\end{figure}\clearpage
+
+\subsection{Policy horse-race}
+\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{figures/policy_cum_single.png}
+\caption{Cumulative excess return, single block move.}
+\end{figure}\clearpage
+\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{figures/policy_cum_double.png}
+\caption{Cumulative excess return, two block moves. The second dashed line is the second phase.}
+\end{figure}\clearpage
+\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{figures/policy_bar_single.png}
+\caption{Median excess return, single block move.}
+\end{figure}\clearpage
+\begin{figure}[p]\centering
+\includegraphics[width=\textwidth]{figures/policy_bar_double.png}
+\caption{Median excess return, two block moves.}
+\end{figure}\clearpage
+
+\section{Tables}
+\input{scorecard_tables.tex}
+\input{policy_tables.tex}
+
+\end{document}
