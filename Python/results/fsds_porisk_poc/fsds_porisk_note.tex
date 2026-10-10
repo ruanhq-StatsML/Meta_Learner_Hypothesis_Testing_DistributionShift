@@ -7,7 +7,7 @@
 \captionsetup{font=small,skip=6pt}
 
 \title{Screening deployed arms by pseudo-outcome risk share\\
-\large A large-batch proof of concept}
+\large Gradual shifts, large batches}
 \author{}
 \date{}
 
@@ -32,8 +32,9 @@ Epsilon-greedy at \(5\%\), \(10\%\), and \(15\%\) is the uniform-exploration com
 
 Each batch has \(200\) rows.
 There are \(80\) rounds.
-A gradual path holds the mixing weight at \(0\) through round \(20\) and then ramps to \(1\).
-A drastic path jumps at round \(40\).
+The mixing weight stays at \(0\) through round \(20\) and then ramps linearly to \(1\) at the last round.
+The next batch is not announced.
+The share is the adaptation: it is recomputed from the latest six batches, on a fixed calendar, with no change-point indicator.
 Post-shift totals use rounds whose mixing weight is at least \(1/2\).
 Early totals use rounds whose mixing weight is exactly \(0\).
 The ramp in between is reported separately.
@@ -57,8 +58,10 @@ Covertype, draw from \(581{,}012\) & \(30{,}000\) & \(54\) \\
 \end{tabular}
 \end{center}
 Real matrices supply covariates only.
-The label is the synthetic shift: relocation of a linear block, a sign flip, a dying block, a nonlinear add-on, or growing noise.
-The headline number below is the median, across the six pools, of the four-seed mean.
+The label moves gradually: a linear block relocates, a sign flips along the ramp, a block dies, a nonlinear term fades in, or the noise scale grows.
+The claim assumes there is no jump.
+A change-point that replaces the mechanism between two rounds is a different problem, and it is not used below.
+The headline number is the median, across the six pools, of the four-seed mean.
 California's nonlinear add-on produces a very large squared term, so a raw mean would follow that one pool.
 
 A second horse-race replaces scorecards by four linear policies on a horizon of four steps, with \(200\) episodes in each round.
@@ -111,15 +114,15 @@ Thompson sampling without the tax tracks the exploring rules; with \(\eta=1\) it
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{figures/eta_profile.png}
-\caption{Median post-shift excess against the scale \(\eta\).
+\includegraphics[width=\textwidth]{figures/eta_profile_gradual.png}
+\caption{Median post-shift excess against the scale \(\eta\), gradual paths only.
 The dashed line is epsilon-greedy at \(10\%\).
-Relocation, a dying block, and a nonlinear add-on slope down for UCB.
-A sign flip slopes up: the tax is the wrong sensor there.
+Relocation, a dying block, and a nonlinear add-on slope down.
+A gradual sign flip slopes up.
 Noise growth is already small for Thompson sampling, and discounting sits above UCB because the best card never changes.}
 \end{figure}
 
-Three regimes show up on every pool.
+Under a ramp, three regimes show up.
 
 \paragraph{The signal changes subspace.}
 Gradual relocation, the nonlinear add-on, and a dying block are this case.
@@ -131,33 +134,23 @@ Epsilon at \(5\%\) is still \(100.6\), and epsilon at \(15\%\) is \(82.6\): a la
 On the nonlinear add-on the best median is discounted UCB at \(\eta=2\), \(2.80\), against \(8.48\) for UCB and \(21.9\) for epsilon at \(10\%\).
 On a gradual death the same rule is \(27.1\), against \(41.6\) for discounting alone and \(52.2\) for UCB.
 
-A drastic relocation is the boundary inside this regime.
-Plain discounted UCB is best, at \(107.7\).
-Adding \(\eta=1\) moves it to \(111.1\), and \(\eta=2\) to \(115.5\).
-The share still separates (fresh near \(0.09\), stale near \(0.32\)), and the tax still beats plain UCB (\(166.3\) to \(134.6\) at \(\eta=2\)).
-Once the index is already discounting, a jump of this size is carried by the reward, and the extra tax does not pay.
-
-\paragraph{The signal flips sign.}
+\paragraph{The signal flips sign along the ramp.}
 A within-window least squares absorbs the sign into the two window-specific slopes.
 The residual then cannot prefer the flipped card.
-On a drastic flip the two signed scores each hold about \(0.03\) of the share and the zero score holds about \(0.90\).
-They are tied, so the tax has nothing to say about which sign is current.
-What it does say is to avoid zero.
-After the flip, predicting zero is the hedge: its mean squared error is on the order of the signal variance, while predicting the wrong sign is on the order of four times that variance.
-UCB without the tax retreats toward zero.
-UCB with \(\eta=1\) is forbidden from that retreat and stays on the stale sign.
-The median post-shift excess goes from \(351\) for UCB and \(235\) for discounted UCB to \(613\) for UCB at \(\eta=1\), and from \(235\) to \(431\) for discounted UCB at \(\eta=1\).
-The shut-off is visible in the share itself, before any regret is computed.
-If one null score holds most of the mass and the remaining scores are tied, set \(\eta=0\) and discount the reward.
-Discounting wins both the gradual flip (\(99.2\)) and the drastic flip (\(234.6\)).
-It wins by hedging toward zero, not by discovering the flipped card: that card's pre-flip mean is terrible and it is almost never pulled.
+On the gradual flip the two signed scores stay close to each other and the zero score takes the largest share, about \(0.38\) to \(0.58\) depending on the pool.
+The tax therefore does not choose the current sign.
+Discounted UCB has median post-shift excess \(99.2\), plain UCB \(166\), and UCB at \(\eta=1\) is \(185\).
+The shut-off is visible in the share, before any regret is computed.
+If the live scores are tied and the null score holds the mass, set \(\eta=0\) and discount the reward.
+Discounting wins by following the recent reward, which moves toward zero while the sign is in between.
+It does not discover the flipped card: that card's early mean is poor and it is rarely pulled.
 
 \paragraph{Only the noise scale changes.}
 The linear score stays correct, and its share stays small, about \(0.10\) to \(0.18\).
 The tax lands on zero and on the irrelevant block.
-Discounting discards a history that is still valid, so discounted UCB is worse than UCB (\(7.28\) against \(3.97\) on the gradual path, \(11.3\) against \(5.37\) on the drastic path).
+Discounting discards a history that is still valid, so discounted UCB is worse than UCB (\(7.28\) against \(3.97\)).
 Thompson sampling already concentrates on the unchanged arm.
-A small tax on top of it is the best rule in the grid: absolute \(\lambda=5\) has median \(0.90\) (gradual) and \(4.21\) (drastic), with Thompson at \(\eta=2\) close behind at \(1.16\) and \(4.36\).
+A small tax on top of it is the best rule on this ramp: absolute \(\lambda=5\) has median \(0.90\), and Thompson at \(\eta=2\) is \(1.16\).
 
 \section{How large the effect is}
 
@@ -193,15 +186,12 @@ Epsilon at \(10\%\) is already higher on five of the six pools before anything m
 
 \paragraph{Where the same bar is cleared, and where it is not.}
 Table~\ref{tab:effect:clear} counts a pool only when the candidate beats the baseline by more than the larger seed standard deviation.
-Growing noise, with Thompson at \(\eta=2\), clears UCB on all six gradual pools and discounted UCB on all six.
+Every row is a ramp.
+Growing noise, with Thompson at \(\eta=2\), clears UCB on all six pools and discounted UCB on all six.
 The best card never changed, the share stays on the irrelevant scores, and the tax is a small push on top of a posterior that was already in the right place.
-A drastic relocation clears UCB on five pools and discounted UCB on none.
-The share still points at the stale block, and that is enough to beat a rule that keeps the whole history.
-It is not enough to beat a rule that is already forgetting that history.
-A sign flip clears nobody who matters.
-Taxed UCB is worse than plain UCB on every pool, and on a drastic flip it is also worse than \(\varepsilon=0.10\) on every pool.
-The negative gaps are larger than the seed noise: Gaussian \(d=30\) goes from \(508\) to \(916\), Covertype from \(648\) to \(1172\).
-This is the tax removing the zero hedge, and it is repeatable.
+A gradual sign flip clears UCB on none of the six pools and discounted UCB on none.
+The negative direction is the same one the share predicts: the tax pushes away from zero while zero is the hedge during the ramp.
+It still beats \(\varepsilon=0.10\) on all six pools, because uniform exploration remains the more expensive mistake.
 
 A dying block and a nonlinear add-on sit between these.
 Discounted UCB with a modest tax has the best median, but the per-pool gap over discounting alone often sits inside the seed noise.
@@ -238,7 +228,9 @@ Values \(\eta>2\) are not needed for the subspace moves, and they are actively h
 \section{The same share on policies}
 
 Four linear policies, one per feature block plus a zero policy, run for four steps.
-The environment coefficient drifts from the first block to the second, and in the double path onward to the third.
+The environment coefficient ramps from the first block to the second, and in the double path onward to the third.
+There is no jump between rounds.
+The same share is refreshed on a fixed calendar, because the next batch is not announced.
 The scalar score of a policy is the return it would earn if the world matched its own coefficient.
 The residual of that score is again the share.
 
@@ -273,17 +265,21 @@ That pattern is the sign-flip failure, and it is readable from the weights alone
 
 \section{Operating summary}
 
+The operating assumption is a ramp.
+The next batch is unknown, so the share is refreshed from the latest window on a fixed calendar.
+No rule below is tuned for a jump.
+
 \begin{center}
 \begin{tabular}{p{0.30\textwidth}p{0.62\textwidth}}
 \toprule
-What the share does & Screen the score that no longer explains the batch. Release the score the batch has moved onto. \\
-Relocation, gradual & UCB or discounted UCB at \(\eta=2\). Median post excess \(17.6\), against \(34.6\), \(24.6\), and \(125\) for UCB, discounted UCB, and \(\varepsilon=0.10\). \\
-Relocation, drastic & Discounted UCB, tax off or very small. Median \(107.7\). The tax still beats plain UCB. \\
-Dying block, nonlinear add-on & Discounted UCB at \(\eta=1\) or \(2\). Best medians \(27.1\), \(35.8\), \(2.80\), \(5.12\). \\
-Sign flip & Tax off. Discount the reward. The share piles onto the zero score and the tax removes the hedge. \\
-Noise growth & Thompson sampling, with a small tax. Do not discount. The best card did not change. \\
-Before any shift & The tax is inert. Epsilon-greedy is not. \\
-Policies & Same rule. Imagine unserved policies from a reward fit. Do not impute a residual of \(1\) for a policy you did not serve. \\
+What the share does & Screen the score that no longer explains the batch. Release the score the ramp has moved onto. \\
+Relocation & UCB or discounted UCB at \(\eta=2\). Median post excess \(17.6\), against \(34.6\), \(24.6\), and \(125\) for UCB, discounted UCB, and \(\varepsilon=0.10\). The gap clears the seed noise on all six pools against UCB. \\
+Dying block & Discounted UCB at \(\eta=2\). Median \(27.1\), against \(41.6\) and \(52.2\). \\
+Nonlinear add-on & Discounted UCB at \(\eta=2\). Median \(2.80\), against \(3.10\) and \(8.48\). The gain over discounting alone is inside the seed noise; the gain over UCB is not. \\
+Sign flip along the ramp & Tax off. Discount the reward. Median \(99.2\), against \(166\) for UCB and \(185\) for UCB at \(\eta=1\). \\
+Noise growth & Thompson sampling with a small tax. Median \(0.90\) at \(\lambda=5\), \(1.16\) at \(\eta=2\). Do not discount. \\
+Before the ramp & The tax is inert. Epsilon-greedy is not. \\
+Policies & Same ramp. Imagine unserved policies from a reward fit. Do not impute a residual of \(1\) for a policy you did not serve. \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -294,6 +290,9 @@ The pseudo-outcome is estimated on \(1{,}200\) rows in each window, and an explo
 \appendix
 \section{Figures}
 \graphicspath{{figures/}}
+
+The figures in this appendix that carry a jump in the mixing weight are not part of the claim.
+The claim is the ramp: the weight is zero through round 20 and then linear.
 
 \subsection{Cumulative excess}
 \newcommand{\cumfig}[2]{%
@@ -370,6 +369,11 @@ The pseudo-outcome is estimated on \(1{,}200\) rows in each window, and an explo
 \end{figure}\clearpage
 
 \section{Tables}
+The tables are all here.
+Post-shift excess, the ramp, the rounds before the ramp, hit rates, PO-risk shares, and the reward scale are one table per path, including the jump paths.
+Policy excess and hit rate are one table per phase.
+The jump-path rows are kept so the ramp numbers can be read next to them.
+They are not used in the claim.
 \input{scorecard_tables.tex}
 \input{policy_tables.tex}
 
