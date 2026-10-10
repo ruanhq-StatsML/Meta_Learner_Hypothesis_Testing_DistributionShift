@@ -44,6 +44,8 @@ SCORE_POLICIES = [
     {"name": "UCB-L5", "rule": "ucb", "eta": 5.0, "mode": "abs", "eps": 0.0},
     {"name": "TS-L5", "rule": "ts", "eta": 5.0, "mode": "abs", "eps": 0.0},
     {"name": "EG10-H1", "rule": "eps", "eta": 1.0, "mode": "scale", "eps": 0.10},
+    {"name": "DUCB-H1", "rule": "ducb", "eta": 1.0, "mode": "scale", "eps": 0.0},
+    {"name": "DUCB-H2", "rule": "ducb", "eta": 2.0, "mode": "scale", "eps": 0.0},
 ]
 
 POLICY_POLICIES = [
@@ -289,42 +291,43 @@ def _summarize_score(details):
     return out
 
 
-def run(smoke=False, workers=4):
+def run(smoke=False, workers=4, part="all"):
     os.makedirs(os.path.join(OUT, "figures"), exist_ok=True)
     pools = load_pools(smoke=smoke)
     seeds = SEEDS[:1] if smoke else SEEDS
     kinds = ["gradual_relocate", "gradual_flip"] if smoke else KINDS
-    print(f"pools={list(pools)} kinds={len(kinds)} seeds={list(seeds)}", flush=True)
-    jobs = [(name, kind, seed) for name in pools for kind in kinds for seed in seeds]
-    details, curves, share_rows = [], [], []
-    with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker, initargs=(smoke,)) as ex:
-        for i, (detail, curve, shares, arms) in enumerate(ex.map(score_job, jobs, chunksize=1), start=1):
-            name = detail[0]["dataset"]
-            kind = detail[0]["scenario"]
-            seed = detail[0]["seed"]
-            details.extend(detail)
-            curves.append((name, kind, seed, curve))
-            share_rows.append((name, kind, seed, shares, arms))
-            if i % 4 == 0 or i == len(jobs):
-                print(f"  scorecard {i}/{len(jobs)} {name} {kind}", flush=True)
-    _write_score_csv(details, curves, share_rows, OUT)
-
-    pjobs = [(name, kind, seed) for name in pools for kind in ("single", "double") for seed in seeds]
-    pdetails, pcurves, pshares = [], [], []
-    with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker, initargs=(smoke,)) as ex:
-        for i, (detail, curve, shares) in enumerate(ex.map(policy_job, pjobs, chunksize=1), start=1):
-            pdetails.extend(detail)
-            pcurves.append((detail[0]["dataset"], detail[0]["scenario"], detail[0]["seed"], curve))
-            pshares.append((detail[0]["dataset"], detail[0]["scenario"], detail[0]["seed"], shares))
-            print(f"  policy {i}/{len(pjobs)} {detail[0]['dataset']} {detail[0]['scenario']}", flush=True)
-    _write_policy_csv(pdetails, pcurves, pshares, OUT)
+    print(f"pools={list(pools)} kinds={len(kinds)} seeds={list(seeds)} part={part}", flush=True)
+    if part in ("all", "score"):
+        jobs = [(name, kind, seed) for name in pools for kind in kinds for seed in seeds]
+        details, curves, share_rows = [], [], []
+        with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker, initargs=(smoke,)) as ex:
+            for i, (detail, curve, shares, arms) in enumerate(ex.map(score_job, jobs, chunksize=1), start=1):
+                name = detail[0]["dataset"]
+                kind = detail[0]["scenario"]
+                seed = detail[0]["seed"]
+                details.extend(detail)
+                curves.append((name, kind, seed, curve))
+                share_rows.append((name, kind, seed, shares, arms))
+                if i % 8 == 0 or i == len(jobs):
+                    print(f"  scorecard {i}/{len(jobs)} {name} {kind}", flush=True)
+        _write_score_csv(details, curves, share_rows, OUT)
+    if part in ("all", "policy"):
+        pjobs = [(name, kind, seed) for name in pools for kind in ("single", "double") for seed in seeds]
+        pdetails, pcurves, pshares = [], [], []
+        with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker, initargs=(smoke,)) as ex:
+            for i, (detail, curve, shares) in enumerate(ex.map(policy_job, pjobs, chunksize=1), start=1):
+                pdetails.extend(detail)
+                pcurves.append((detail[0]["dataset"], detail[0]["scenario"], detail[0]["seed"], curve))
+                pshares.append((detail[0]["dataset"], detail[0]["scenario"], detail[0]["seed"], shares))
+                print(f"  policy {i}/{len(pjobs)} {detail[0]['dataset']} {detail[0]['scenario']}", flush=True)
+        _write_policy_csv(pdetails, pcurves, pshares, OUT)
     print("csv written", flush=True)
-    return details, pdetails
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--part", choices=("all", "score", "policy"), default="all")
     args = parser.parse_args()
-    run(smoke=args.smoke, workers=args.workers)
+    run(smoke=args.smoke, workers=args.workers, part=args.part)

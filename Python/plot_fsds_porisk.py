@@ -60,7 +60,7 @@ SCORE_POLICIES = [
     "UCB", "DUCB", "TS", "EG05", "EG10", "EG15",
     "UCB-H0.5", "UCB-H1", "UCB-H2",
     "TS-H0.5", "TS-H1", "TS-H2",
-    "UCB-L5", "TS-L5", "EG10-H1",
+    "UCB-L5", "TS-L5", "EG10-H1", "DUCB-H1", "DUCB-H2",
 ]
 POL_TEX = {
     "UCB": "UCB",
@@ -78,6 +78,8 @@ POL_TEX = {
     "UCB-L5": r"UCB$_{\lambda=5}$",
     "TS-L5": r"TS$_{\lambda=5}$",
     "EG10-H1": r"$\varepsilon$.10$_{\eta=1}$",
+    "DUCB-H1": r"dUCB$_{\eta=1}$",
+    "DUCB-H2": r"dUCB$_{\eta=2}$",
     "UCB-H1-on": r"UCB$_{\eta=1}$, on-policy",
     "TS-H1-on": r"TS$_{\eta=1}$, on-policy",
     "UCB-H1-fit": r"UCB$_{\eta=1}$, fitted",
@@ -145,11 +147,12 @@ def _cell(pair, digits=2):
 def _tex_table(caption, label, col_heads, row_heads, cells, note):
     spec = "l" + "c" * len(col_heads)
     lines = [
-        r"\begin{table}[ht]",
+        r"\begin{table}[p]",
         r"\centering",
         r"\scriptsize",
         rf"\caption{{{caption}}}",
         rf"\label{{{label}}}",
+        r"\resizebox{\textwidth}{!}{%",
         rf"\begin{{tabular}}{{{spec}}}",
         r"\toprule",
         " & ".join([""] + col_heads) + r" \\",
@@ -157,7 +160,14 @@ def _tex_table(caption, label, col_heads, row_heads, cells, note):
     ]
     for head, row in zip(row_heads, cells):
         lines.append(head + " & " + " & ".join(row) + r" \\")
-    lines += [r"\bottomrule", r"\end{tabular}", rf"\parbox{{\textwidth}}{{\scriptsize {note}}}", r"\end{table}", ""]
+    lines += [
+        r"\bottomrule",
+        r"\end{tabular}}",
+        rf"\parbox{{\textwidth}}{{\scriptsize {note}}}",
+        r"\end{table}",
+        r"\clearpage",
+        "",
+    ]
     return "\n".join(lines)
 
 
@@ -170,7 +180,7 @@ def write_score_tables(summary, share_rows):
     datasets = _datasets(summary)
     chunks = []
     # Headline: median across datasets of the seed-mean post excess.
-    head_policies = ["UCB", "DUCB", "TS", "EG10", "UCB-H1", "UCB-H2", "TS-H1", "TS-H2", "EG10-H1", "UCB-L5"]
+    head_policies = ["UCB", "DUCB", "DUCB-H1", "DUCB-H2", "TS", "EG10", "UCB-H1", "UCB-H2", "TS-H2", "UCB-L5"]
     head_cells = []
     winners = []
     for scen in SCENARIOS:
@@ -188,7 +198,7 @@ def write_score_tables(summary, share_rows):
     chunks.append(_tex_table(
         "Median across covariate pools of the mean post-shift excess MSE. "
         "Each pool contributes the average over four seeds. Lower is better. "
-        "The last column is the lowest median among all fifteen rules, not only the columns shown.",
+        "The last column is the lowest median among all rules, not only the columns shown.",
         "tab:headline",
         [POL_TEX[p] for p in head_policies] + ["best"],
         [SCEN_TEX[s] for s in SCENARIOS],
@@ -243,6 +253,7 @@ def write_score_tables(summary, share_rows):
         arm_names[(row["dataset"], row["scenario"])] = [row[f"name{i}"] for i in range(4)]
     for scen in SCENARIOS:
         names = arm_names[(datasets[0], scen)]
+        safe_names = [n.replace("_", r"\_") for n in names]
         cells = []
         for ds in datasets:
             seed_means = []
@@ -254,9 +265,9 @@ def write_score_tables(summary, share_rows):
             cells.append([f"{mat[:, i].mean():.3f} ({mat[:, i].std(ddof=1):.3f})" for i in range(4)])
         chunks.append(_tex_table(
             f"Post-shift PO-risk shares: {SCEN_TEX[scen]}. "
-            f"Arms are {', '.join(names)}. Mean of the refresh-time shares on post-shift rounds, then mean and seed sd across four seeds.",
+            f"Arms are {', '.join(safe_names)}. Mean of the refresh-time shares on post-shift rounds, then mean and seed sd across four seeds.",
             f"tab:share:{scen}",
-            [n.replace("_", r"\_") for n in names],
+            safe_names,
             [DS_TEX[d] for d in datasets],
             cells,
             "The share is the residual pseudo-outcome risk of that score, divided by the sum across the four scores. It does not depend on which arm was served.",
@@ -449,10 +460,9 @@ def plot_eta(summary, datasets):
             return ys
         ax.plot(etas, series(ucb_names), marker="o", color="#54A24B", lw=1.8, label="UCB + share")
         ax.plot(etas, series(ts_names), marker="o", color="#B279A2", lw=1.8, label="TS + share")
+        ax.plot([0, 1, 2], series(["DUCB", "DUCB-H1", "DUCB-H2"]), marker="s", color="#72B7B2", lw=1.8, label="dUCB + share")
         eg = float(np.median([summary[(ds, scen, "EG10")]["post"][0] for ds in datasets]))
-        ducb = float(np.median([summary[(ds, scen, "DUCB")]["post"][0] for ds in datasets]))
         ax.axhline(eg, color="#E45756", ls="--", lw=1.0, label=r"ε = 0.10")
-        ax.axhline(ducb, color="#72B7B2", ls=":", lw=1.2, label="dUCB")
         ax.set_title(SCEN_TEX[scen], fontsize=9)
         ax.set_xlabel(r"scale $\eta$")
         ax.set_ylabel("median post excess")
@@ -466,7 +476,7 @@ def plot_eta(summary, datasets):
 
 def plot_policy(curve_rows, summary, datasets):
     _style()
-    show = ("UCB", "DUCB", "TS", "EG10", "UCB-H1", "TS-H1", "UCB-H2", "UCB-H1-on", "UCB-H1-fit")
+    show = ("UCB", "DUCB", "TS", "EG10", "UCB-H1", "TS-H1", "UCB-H1-on", "UCB-H1-fit")
     colors = {
         "UCB": "#4C78A8", "DUCB": "#72B7B2", "TS": "#F58518", "EG10": "#E45756",
         "UCB-H1": "#54A24B", "TS-H1": "#B279A2", "UCB-H2": "#1F7A1F",
@@ -482,13 +492,15 @@ def plot_policy(curve_rows, summary, datasets):
         for ax, ds in zip(axes.ravel(), datasets):
             for policy in show:
                 seed_map = defaultdict(list)
-                for seed, t, cum in grouped[scen][ds][policy]:
+                for seed, t, cum in grouped[scen][ds].get(policy, []):
                     seed_map[seed].append((t, cum))
+                if not seed_map:
+                    continue
                 mats = []
                 for pairs in seed_map.values():
                     pairs.sort()
                     mats.append([c for _, c in pairs])
-                mat = np.array(mats)
+                mat = np.vstack(mats)
                 mean = mat.mean(axis=0)
                 tt = np.arange(len(mean))
                 ax.plot(tt, mean, color=colors[policy], lw=1.5, label=policy)
