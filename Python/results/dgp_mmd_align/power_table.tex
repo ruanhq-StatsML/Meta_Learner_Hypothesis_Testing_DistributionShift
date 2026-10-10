@@ -1,0 +1,45 @@
+\begin{table}[p]
+\centering
+\caption{Rejection rate on the stored draws, pooled across concept-drift settings. Those settings change $Y$ only, so they are replicates of the same $P(X)$ shift. The null row is every draw with no covariate shift.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllcccccc}
+\toprule
+shift & $\delta$ & $n$ & MMD & max LOCO & positive-sum LOCO & MMD $\gamma=1$ & Xu & C2ST \\
+\midrule
+covariance & 0.25 & 21 & 0.29 & 0.10 & 0.19 & 0.24 & 0.10 & 0.05 \\
+covariance & 0.50 & 21 & 0.57 & 0.76 & 1.00 & 0.52 & 0.05 & 0.14 \\
+covariance & 0.75 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 0.00 & 0.81 \\
+covariance & 1.00 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 0.05 & 1.00 \\
+mean & 0.25 & 21 & 1.00 & 1.00 & 1.00 & 0.81 & 1.00 & 0.76 \\
+mean & 0.50 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 \\
+mean & 0.75 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 \\
+mean & 1.00 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 \\
+mixture & 0.25 & 21 & 1.00 & 1.00 & 1.00 & 0.95 & 1.00 & 0.90 \\
+mixture & 0.50 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 \\
+mixture & 0.75 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 \\
+mixture & 1.00 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 & 1.00 \\
+none & 0.00 & 41 & 0.05 & 0.00 & 0.02 & 0.02 & 0.02 & 0.07 \\
+support & 0.25 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 0.00 & 1.00 \\
+support & 0.50 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 0.10 & 1.00 \\
+support & 0.75 & 21 & 0.10 & 0.00 & 0.00 & 1.00 & 0.00 & 1.00 \\
+support & 1.00 & 21 & 1.00 & 1.00 & 1.00 & 1.00 & 0.00 & 1.00 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\clearpage
+\begin{table}[p]
+\centering
+\caption{Same tests, averaged inside each DGP label. \texttt{concept\_only} keeps $P(X)$ fixed and moves the regression.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccccc}
+\toprule
+label & $n$ & MMD & max LOCO & positive-sum LOCO & MMD $\gamma=1$ & Xu & C2ST \\
+\midrule
+concept\_only & 38 & 0.05 & 0.00 & 0.03 & 0.03 & 0.03 & 0.08 \\
+covariate\_only & 32 & 0.91 & 0.88 & 0.91 & 0.94 & 0.50 & 0.88 \\
+mixed & 304 & 0.87 & 0.87 & 0.88 & 0.90 & 0.52 & 0.85 \\
+no\_shift & 3 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\clearpage

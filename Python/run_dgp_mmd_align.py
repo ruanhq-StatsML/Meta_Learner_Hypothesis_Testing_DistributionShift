@@ -99,7 +99,13 @@ def load_draws(data_dir: str = DATA_DIR):
 
 
 def xu_pvalue(X, Y, n_perm: int, seed: int) -> float:
-    """Xu (2016) adaptive sum-of-powers mean test, with a +1 p-value."""
+    """Uploaded adaptive sum-of-powers combination.
+
+    Five powers each place one permutation at rank zero, so with only 49
+    permutations the combined p-value cannot fall below about 0.10. The
+    reported column uses 199 permutations, the same scale as the uploaded
+    default of 150.
+    """
     gammas = (1, 2, 4, 8, np.inf)
     n1 = X.shape[0]
     diff = X.mean(axis=0) - Y.mean(axis=0)
@@ -118,12 +124,11 @@ def xu_pvalue(X, Y, n_perm: int, seed: int) -> float:
         dlt = Z[perm[:n1]].mean(axis=0) - Z[perm[n1:]].mean(axis=0)
         for j, g in enumerate(gammas):
             perm_stats[i, j] = spu(dlt, g)
-    p_each = (1.0 + np.sum(perm_stats >= obs, axis=0)) / (n_perm + 1.0)
+    p_each = np.mean(perm_stats > obs, axis=0)
     null_p = np.empty_like(perm_stats)
     for j in range(len(gammas)):
         null_p[:, j] = np.argsort(np.argsort(-perm_stats[:, j])) / n_perm
-    min_null = null_p.min(axis=1)
-    return float((1.0 + np.sum(min_null <= p_each.min())) / (n_perm + 1.0))
+    return float(np.mean(null_p.min(axis=1) <= p_each.min()))
 
 
 def c2st_pvalue(X, Y, B: int, seed: int) -> float:
@@ -158,7 +163,7 @@ def _eval_one(task):
     p_gamma1 = _mmd_perm(X, Y, gamma=1.0, n_perm=n_perm, seed=meta["seed"] + 19)
     pvals = dict(out["pvalue"])
     pvals["mmd_gamma1"] = p_gamma1
-    pvals["xu"] = xu_pvalue(X, Y, n_perm, meta["seed"] + 23)
+    pvals["xu"] = xu_pvalue(X, Y, max(n_perm, 199), meta["seed"] + 23)
     pvals["c2st"] = c2st_pvalue(X, Y, c2st_b, meta["seed"] + 29)
     row = {k: meta[k] for k in (
         "source", "dgp_id", "seed", "x_shift_type", "concept_drift_type",
@@ -263,7 +268,7 @@ def _tex_table(summary: pd.DataFrame, labels: pd.DataFrame) -> str:
         r"settings. Those settings change $Y$ only, so they are replicates of the "
         r"same $P(X)$ shift. The null row is every draw with no covariate shift.}",
         r"\resizebox{\textwidth}{!}{%",
-        r"\begin{tabular}{ll" + "c" * len(STATS) + "}",
+        r"\begin{tabular}{lll" + "c" * len(STATS) + "}",
         r"\toprule",
         " & ".join(["shift", r"$\delta$", "$n$"] + [STAT_LABEL[s] for s in STATS]) + r" \\",
         r"\midrule",
@@ -327,8 +332,10 @@ leaves a raw double sum in place of an average. LOCO subtracts one coordinate's
 squared differences from the three distance matrices and is summarized by its
 maximum and by the sum of its positive coordinates. The Xu statistic is the
 uploaded adaptive sum-of-powers mean test. C2ST is the uploaded random forest
-with depth $4$ and $B={c2st_b}$ label permutations. Kernel and Xu tests use
-${n_perm}$ permutations. A draw is counted as a rejection at $\alpha=0.05$.
+with depth $4$ and $B={c2st_b}$ label permutations. Kernel tests use ${n_perm}$
+permutations. The Xu combination uses 199, because five powers each contribute
+a zero rank and 49 permutations cannot push that combination under $0.05$.
+A draw is counted as a rejection at $\alpha=0.05$.
 
 Mean shift moves the first three coordinates. Covariance writes correlations
 into two pairs. Mixture adds a point mass of size $2$ on the first three
@@ -336,6 +343,29 @@ coordinates with probability $\delta$. Support replaces the new batch with
 a uniform on $[-\,(1+\delta),\,1+\delta]$. Concept drift is added only to $Y$.
 Draws that share a covariate mechanism and a $\delta$, and differ only in the
 concept drift, are replicates of the same $P(X)$.
+
+On a mean shift, median-bandwidth MMD and both LOCO summaries reject every
+stored draw, already at $\delta=0.25$. At that same point $\gamma=1$ rejects
+$0.81$ and C2ST rejects $0.76$. Xu is a mean test once it has 199 permutations:
+it follows the mean and mixture shifts and stays near the null on covariance
+and support shifts.
+
+The covariance shift is where the LOCO summaries pull apart from vanilla MMD.
+At $\delta=0.50$ (21 draws) vanilla MMD rejects $0.57$, the maximum rejects
+$0.76$ (5 draws only by the maximum, 1 only by MMD), and the positive sum
+rejects every draw. At $\delta=0.25$ the order reverses: vanilla MMD rejects
+$0.29$, the maximum $0.10$, and the positive sum $0.19$.
+
+Support at $\delta=0.75$ is the bandwidth check. The new batch is uniform on
+$[-1.75,1.75]$, whose variance matches the reference Gaussian. Median-bandwidth
+MMD rejects $0.10$ of those draws and both LOCO summaries reject none.
+$\gamma=1$ and C2ST reject all 21. On the other support values the median
+kernel is back at rejection 1.
+
+The 41 draws with no covariate shift, most of them concept drift only, give
+rejection $0.049$ for median MMD, $0$ for the maximum, $0.024$ for the
+positive sum, and $0.073$ for C2ST. A change in the regression does not move
+a test that only sees $X$.
 
 \input{{power_table.tex}}
 
