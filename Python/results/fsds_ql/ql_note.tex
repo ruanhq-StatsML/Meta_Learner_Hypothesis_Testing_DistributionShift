@@ -1,0 +1,100 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,graphicx,amsmath}
+\title{Online Q-learning on the same gradual scorecard race}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\section{What can differ from UCB}
+
+The arms, the batch of 200, and the pseudo-outcome share are the relocation MVP.
+The reward is still negative batch mean squared error. In a stateless bandit,
+Sarsa and Q-learning select the same arm, and a step size \(1/n\) is the sample
+mean already inside UCB. The updates below are the ones that can actually move
+the index: a constant step, two tables, a speedy extrapolation, a softmax, and
+a window of the last eight rewards. Constant-step Q, double Q, the bonus,
+and the window are also run with the FSDS tax at \(\eta=2\). Speedy Q and
+Boltzmann are reported without that tax. The first four rounds still pull each
+arm once. A table is
+initialized at the first reward of that arm. A zero start would be optimistic,
+because the rewards are negative.
+
+Constant \(\alpha\) forgets. Greedy Q never refreshes an arm it has stopped
+pulling, so a value frozen before the ramp cannot follow the fresh block.
+A bonus, a softmax, or a sliding window is what lets the other arms move.
+The tax is subtracted from every arm's index, not only from the arm just pulled.
+
+\section{Relocation stays with the tax}
+
+UCB at \(\eta=2\) remains the reference. Its median post-shift excess is
+17.6, against 34.6
+for plain UCB and 24.6 for discounted UCB.
+Greedy Q at \(\alpha=0.2\) is 28.8. That gap
+against UCB at \(\eta=2\) clears the larger seed standard deviation on
+6/6 pools. The same tax on the frozen
+value gives 18.5. Q plus a UCB bonus, without
+the tax, is 25.5, next to discounted UCB, and
+it clears discounted UCB on 1/6 pools.
+The bonus with the tax is 17.8. Speedy Q is
+the lowest untaxed rule at 21.9, and UCB at
+\(\eta=2\) still clears it on 5/6 pools.
+Double Q updates one table at random and finishes at
+40.5. Boltzmann pays during the stationary window
+(early excess 38.6, against
+16.6 for UCB) and finishes at
+62.6.
+
+On covertype, Gaussian-30, and Student-$t_5$, all four seeds of Q-plus-bonus at \(\eta=2\) match
+UCB at \(\eta=2\). The match is 15 of 24 seed-pool pairs, and the
+eight-step window with the same bonus and tax matches on 15 of 24
+(covertype, Gaussian-30, and Student-$t_5$). Once the share is sharp, the tax is choosing the arm.
+The taxed bonus rule undercuts UCB at \(\eta=2\) by more than the seed standard
+deviation on California (0.7, sd 0.7, against 1.5, sd 0.6). The absolute gap is under one excess MSE, and the
+median across pools stays with UCB at \(\eta=2\)
+(17.6 against
+17.8).
+
+\section{The sign flip is the one Q gain}
+
+On a gradual sign flip the tax is the wrong instrument. UCB sits at
+166.1 and UCB at \(\eta=2\) at
+187.4. Discounted UCB is
+99.2. Q plus a UCB bonus, with the tax off, is
+74.0. That gap clears the larger seed standard
+deviation against discounted UCB on 5/6
+pools and against plain UCB on 6/6.
+The pool that stays inside the seed noise is California, where the bonus rule is 20.3 (sd 3.0) and discounted UCB is 22.4 (sd 1.0). Speedy Q is
+79.4 and clears discounted UCB on
+3/6 pools, so the median alone overstates it.
+The post-shift hit rate of Q plus the bonus is 0.22.
+The rule still misses the live card on most batches after the ramp. This is a
+side result. It does not replace the relocation index.
+
+\section{Noise growth}
+
+When the best card never changes, forgetting a still-valid history costs excess.
+Thompson sampling is 1.1 and clears UCB on
+6/6 pools. UCB is
+4.0 and UCB at \(\eta=2\) is
+3.7. Greedy Q at \(\alpha=0.05\) is
+6.1, speedy Q is
+5.2, and Q plus a bonus is
+15.2. UCB at \(\eta=2\) clears that bonus rule
+on 6/6 pools.
+
+The relocation index stays UCB minus \(\eta\sigma w_k\) at \(\eta=2\).
+The sign-flip gain of Q plus a bonus is a side record, and on that ramp the tax
+stays off.
+
+\input{ql_table.tex}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{ql_bars.png}
+\caption{Median post-shift excess across the six pools.
+UCB at \(\eta=2\) is marked in green. The top panel is gradual relocation.
+The bottom panel is the gradual sign flip, where that tax raises the excess.}
+\end{figure}
+\end{document}

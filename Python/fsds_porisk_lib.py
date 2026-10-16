@@ -236,6 +236,56 @@ def _ts_draw(hist, rng):
     return draws
 
 
+def _q_select(rule, Q, Q2, n_pull, w, lam, t, sigma, rng):
+    if rule == "dql":
+        value = 0.5 * (Q + Q2)
+        bonus = 0.0
+    elif rule == "qlucb":
+        value = Q
+        bonus = np.sqrt(2.0 * np.log(t + 1.0) / np.maximum(n_pull, 1.0))
+    else:
+        value = Q
+        bonus = 0.0
+    index = value + bonus - lam * w
+    if rule == "bolt":
+        temp = sigma if sigma > 1e-6 else 1.0
+        logits = np.asarray(index, dtype=float) / temp
+        logits -= logits.max()
+        prob = np.exp(logits)
+        prob /= prob.sum()
+        return int(rng.choice(len(Q), p=prob))
+    return int(np.argmax(index))
+
+
+def _q_update(rule, arm, reward, Q, Q2, Qprev, n_pull, alpha, rng):
+    if rule not in ("ql", "qlucb", "dql", "sql", "bolt"):
+        n_pull[arm] += 1.0
+        return
+    if rule == "dql":
+        if n_pull[arm] == 0:
+            Q[arm] = reward
+            Q2[arm] = reward
+        elif rng.random() < 0.5:
+            Q[arm] += alpha * (reward - Q[arm])
+        else:
+            Q2[arm] += alpha * (reward - Q2[arm])
+    elif rule == "sql":
+        if n_pull[arm] == 0:
+            Q[arm] = reward
+            Qprev[arm] = reward
+        else:
+            stepped = Q[arm] + alpha * (reward - Q[arm])
+            speedy = stepped + (1.0 - alpha) * (stepped - Qprev[arm])
+            Qprev[arm] = Q[arm]
+            Q[arm] = speedy
+    else:
+        if n_pull[arm] == 0:
+            Q[arm] = reward
+        else:
+            Q[arm] += alpha * (reward - Q[arm])
+    n_pull[arm] += 1.0
+
+
 def replay(y, preds, post, alpha, wpath, sigma, policy, seed):
     """policy: dict with keys rule, eta, mode, eps.
 
@@ -261,7 +311,13 @@ def replay(y, preds, post, alpha, wpath, sigma, policy, seed):
     eta = float(policy["eta"])
     mode = policy["mode"]
     eps = float(policy["eps"])
+    alpha_q = float(policy.get("alpha", 0.2))
+    window = int(policy.get("window", 8))
     lam = (eta * sigma) if mode == "scale" else eta
+    Q = np.zeros(k)
+    Q2 = np.zeros(k)
+    Qprev = np.zeros(k)
+    n_pull = np.zeros(k)
     for t in range(rounds):
         if t in wpath:
             w = wpath[t]
@@ -277,11 +333,23 @@ def replay(y, preds, post, alpha, wpath, sigma, policy, seed):
             elif rule == "ts":
                 index = _ts_draw(hist, rng) - lam * w
                 arm = int(np.argmax(index))
+            elif rule in ("ql", "qlucb", "dql", "sql", "bolt"):
+                arm = _q_select(rule, Q, Q2, n_pull, w, lam, t, sigma, rng)
+            elif rule == "qwin":
+                means = np.array([
+                    float(np.mean(h[-window:])) if h else 0.0 for h in hist
+                ])
+                bonus = np.sqrt(2.0 * np.log(t + 1.0) / np.maximum(n_pull, 1.0))
+                use_bonus = bool(policy.get("bonus", False))
+                index = means + (bonus if use_bonus else 0.0) - lam * w
+                arm = int(np.argmax(index))
             else:
                 means, bonuses = _mean_bonus(hist, t, "ducb" if rule == "ducb" else rule)
                 index = means + bonuses - lam * w
                 arm = int(np.argmax(index))
-        hist[arm].append(float(pays[arm]))
+        reward = float(pays[arm])
+        _q_update(rule, arm, reward, Q, Q2, Qprev, n_pull, alpha_q, rng)
+        hist[arm].append(reward)
         excess = float(mse[arm] - mse[best])
         path[t] = excess
         correct = int(arm == best)
