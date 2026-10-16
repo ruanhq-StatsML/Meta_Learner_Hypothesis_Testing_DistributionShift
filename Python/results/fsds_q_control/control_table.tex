@@ -1,0 +1,49 @@
+\begin{table}[ht]
+\centering
+\caption{Median, across six pools, of the four-seed mean post-shift excess return.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccccc}
+\toprule
+scenario & UCB & DUCB & UCB-H2 & EG10 & Q & QUCB & DQ & QS & QS-UCB & DQS \\
+\midrule
+control\_relocate & 32.7 & 15.3 & 9.7 & 53.1 & 39.2 & 15.9 & 21.6 & 21.1 & 28.1 & 38.7 \\
+control\_flip & 148.3 & 99.2 & 132.0 & 153.1 & 81.4 & 7.3 & 24.2 & 62.9 & 25.9 & 39.6 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Control relocation. Sum of per-round mean excess return after the ramp crosses one half. Seed standard deviation in parentheses.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+pool & UCB & DUCB & UCB-H2 & QUCB & DQ & QS-UCB \\
+\midrule
+AR(1) & 31.5 (1.1) & 15.2 (1.4) & 9.8 (4.8) & 9.6 (0.6) & 13.0 (1.5) & 23.5 (0.7) \\
+California & 8.6 (0.5) & 6.4 (0.1) & 3.3 (0.2) & 12.5 (0.5) & 9.3 (0.7) & 21.8 (0.7) \\
+covertype & 33.9 (4.5) & 14.9 (0.8) & 7.2 (0.3) & 26.2 (3.1) & 28.0 (0.6) & 35.4 (2.7) \\
+Gaussian-12 & 30.8 (0.8) & 15.4 (0.4) & 9.5 (2.4) & 9.7 (0.8) & 15.5 (1.0) & 25.5 (0.7) \\
+Gaussian-30 & 50.9 (1.4) & 22.9 (1.1) & 20.4 (0.6) & 21.5 (3.3) & 27.7 (2.2) & 30.6 (0.6) \\
+Student-$t_5$ & 44.9 (3.2) & 23.5 (1.2) & 19.4 (1.3) & 19.4 (3.0) & 29.4 (2.0) & 31.2 (0.7) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Control sign flip. Same excess. Seed standard deviation in parentheses.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+pool & UCB & DUCB & UCB-H2 & QUCB & DQ & QS-UCB \\
+\midrule
+AR(1) & 97.6 (1.0) & 65.3 (1.2) & 88.5 (1.6) & 2.3 (0.8) & 12.1 (3.1) & 15.3 (4.8) \\
+California & 83.5 (1.3) & 56.9 (2.2) & 78.2 (1.6) & 2.4 (0.6) & 10.3 (1.9) & 10.6 (5.5) \\
+covertype & 200.4 (3.6) & 132.9 (1.9) & 160.9 (7.4) & 22.8 (10.6) & 37.7 (5.8) & 43.2 (6.5) \\
+Gaussian-12 & 115.1 (2.9) & 78.8 (1.3) & 105.5 (3.6) & 2.9 (0.5) & 16.8 (2.4) & 20.5 (4.5) \\
+Gaussian-30 & 185.6 (3.1) & 124.9 (3.5) & 160.4 (7.1) & 12.6 (5.3) & 31.6 (4.3) & 37.3 (11.5) \\
+Student-$t_5$ & 181.5 (1.4) & 119.6 (3.7) & 158.5 (4.9) & 11.6 (7.0) & 34.8 (6.6) & 31.3 (15.4) \\
+\bottomrule
+\end{tabular}}
+\end{table}
