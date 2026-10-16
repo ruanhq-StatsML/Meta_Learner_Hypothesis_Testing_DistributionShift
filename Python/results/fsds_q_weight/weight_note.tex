@@ -2,26 +2,29 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{booktabs,graphicx,amsmath}
 \title{An FSDS weight on the Q-index\\
-\large Same table, a penalty on the action the stale policy would take}
+\large The share names a stale score. The action stays in the table.}
 \author{}
 \date{}
 \begin{document}
 \maketitle
 
-\section{Where the weight sits}
+\section{The index}
 
-The control task already has a visit-bonus table \(Q(s,a)\). The state \(s\) is
-the three-way sign of two known reference scores and the step. Putting the
-pseudo-outcome share into that state split the visits and raised the excess
-on the sign flip. The weight below does not add a coordinate.
+The control task keeps a visit-bonus table \(Q(s,a)\). The state \(s\) is the
+three-way sign of two known reference scores and the step. An earlier table
+also conditioned on which reference policy held the pseudo-outcome share.
+That coordinate split the visits and raised the excess on the sign flip.
+The weight in this note is a term in the decision index. The state is the
+same two signs and the step.
 
 Four reference policies are scored on every batch, on the same calendar as
-the scorecard race. The weight uses the two directional scores, the same two
-whose signs form the state. Write \(w_{(1)}\) and \(w_{(2)}\) for the larger
-and the smaller of their shares, and \(a_{(1)}(s)\), \(a_{(2)}(s)\) for the
-actions they prescribe. The penalty on an action is the share gap, and only
-on the action of the higher share, and only in states where the two actions
-differ:
+the scorecard race: the first six rounds against the latest six, refreshed
+every eight rounds from round 16. The weight uses the two directional
+scores, the same two whose signs form the state. Write \(w_{(1)}\) and
+\(w_{(2)}\) for the larger and the smaller of their shares, and
+\(a_{(1)}(s)\), \(a_{(2)}(s)\) for the actions they prescribe. The
+penalty is the share gap. It falls on the action of the higher share, and
+only in states where the two actions differ,
 \[
 \delta(s,a)=(w_{(1)}-w_{(2)})\,1\{a=a_{(1)}(s)\}\,1\{a_{(1)}(s)\neq a_{(2)}(s)\}.
 \]
@@ -30,86 +33,97 @@ The decision index is
 Q(s,a)+c(s,a)-\eta\sigma\cdot\frac{H-h}{H}\cdot\delta(s,a),
 \]
 with \(\eta\in\{1,2\}\) and \(\sigma\) the scale of the four reference
-returns on the first six rounds. The factor \((H-h)/H\) charges the
-episode-level penalty once along the horizon. Equal shares give
-\(\delta=0\), so the weight is inert while the two scores still carry the
-same residual. Agreement of the two actions also gives \(\delta=0\): the
-weight does not tax a button both scores would press.
+returns on the first six rounds. The factor \((H-h)/H\) places one
+episode-level charge along the horizon. Equal shares give \(\delta=0\), so
+the weight is inert while the two scores still carry the same residual.
+Agreed actions also give \(\delta=0\): both scores would press the same
+button, and that button carries no penalty.
 
-The backup is unchanged. The target is the observed reward plus the max of
-the next raw table. The share is a statement about which reference score
-still explains the outcome. It is not a reward, so it does not enter the
-value being learned. An unvisited cell still carries the large visit bonus,
-so the weight cannot hide an action the table has not tried.
+The backup is the observed reward plus the max of the next raw table. The
+share records which reference score still explains the outcome, and it stays
+out of the value being learned. An unvisited cell still carries the large
+visit bonus, so the weight cannot hide an action the table has not tried.
 
-One variant turns the weight off on a round whose largest share belongs to
-the zero policy. That is the sign-flip symptom: the null score holds the
-mass, and a penalty aimed at a stale action has nothing stale to point at.
-Across pools, the fraction of post-shift rounds in which the zero policy
-holds the share has median 0.00 on relocation and
-0.00 on the flip.
+One variant sets the weight to zero on a round whose largest share belongs
+to the zero policy. That is the sign-flip symptom the shut-off was built
+for: the null score holds the mass, and a penalty aimed at a stale direction
+has no stale direction left. Across the six pools, the fraction of
+post-shift rounds on which the zero policy holds the share has median
+0.00 on relocation and 0.00
+on the flip.
 
-\section{Relocation}
+\section{Six pools}
 
-The menu at \(\eta=2\) has median post excess
-9.7. Visit-bonus Q with no weight is
-15.9. The same table at \(\eta=1\) is
-15.7, at \(\eta=2\) is
-15.9, and at \(\eta=2\) with the zero-policy
-shut-off is 15.9. Discounted UCB on the
-menu is 15.3.
+A reported median is the median, across six pools, of the four-seed mean
+post-shift excess. A named pool is that four-seed mean, with the seed
+standard deviation in parentheses. A gap counts only when it exceeds the
+larger of the two seed standard deviations.
 
-The \(\eta=2\) weight is lower than unweighted Q by more than the larger
-seed standard deviation on 0/6 pools.
-It is lower than the menu at \(\eta=2\) on
-0/6, and the menu is lower than the
-weight on 2/6. Early excess is
-12.5 without the weight and
-12.5 with it. The first-action hit rate is
-0.77 for the weight and
+On relocation the menu at \(\eta=2\) is 9.7.
+Visit-bonus Q with no weight is 15.9. The
+same table at \(\eta=1\) is 15.7 and at
+\(\eta=2\) is 15.9. Discounted UCB on the
+menu is 15.3. The \(\eta=2\) weight is lower
+than unweighted Q on 0/6 pools, and
+lower than the menu on 0/6. The
+menu is lower than the weight on 2/6.
+California is 3.3 (0.2) for the menu and
+11.7 (0.9) for the weight. Covertype is
+7.2 (0.3) for the menu and
+26.3 (1.6) for the weight. On AR(1),
+Gaussian-12, Gaussian-30, and Student-$t_5$ the gap stays inside the larger
+seed standard deviation. Early excess, before the ramp, is
+12.5 for the unweighted table and
+12.5 for the weight. The first-action hit
+rate is 0.77 for the weight and
 0.85 for the menu.
 
-\section{Sign flip}
+On the sign flip, unweighted visit-bonus Q is 7.4,
+with first-action hit rate 0.64. The weight at
+\(\eta=1\) is 10.5 and at \(\eta=2\) is
+14.1, with hit rate 0.54.
+The menu at \(\eta=2\) is 132.0 and discounted
+UCB is 99.2. Unweighted Q is lower than the
+\(\eta=2\) weight on 2/6 pools.
+Gaussian-30 is 12.6 (5.2) for the unweighted
+table and 25.2 (10.1) for the weight.
+Student-$t_5$ is 11.8 (7.1) for the unweighted
+table and 27.0 (9.3) for the weight. AR(1),
+California, and Gaussian-12 stay near 3, unweighted table then weight:
+2.5 (0.5) and
+2.8 (1.4),
+2.5 (0.6) and
+3.0 (1.5),
+3.1 (0.5) and
+2.6 (0.8). Covertype is
+21.1 (5.6) and
+28.5 (11.9); that gap is smaller than the seed
+standard deviation.
 
-Unweighted visit-bonus Q is 7.4. The weight at
-\(\eta=1\) is 10.5, at \(\eta=2\) is
-14.1, and with the zero-policy shut-off is
-14.1. The menu at \(\eta=2\) is
-132.0 and discounted UCB is
-99.2.
+The zero-policy shut-off does not fire once the ramp has crossed one half.
+On relocation every pool mean matches the always-on weight, so the median
+stays at 15.9. On the flip the shut-off
+fires on a few earlier rounds. The post-shift median stays at
+14.1. The mean across the six pools moves from
+14.84 to 14.82.
+AR(1) moves from 2.8 (1.4) to
+2.7 (1.5). The shut-off is lower than the
+always-on weight by more than the seed standard deviation on
+0/6 pools.
 
-The shut-off rule is lower than the always-on \(\eta=2\) weight by more than
-the seed standard deviation on 0/6
-pools. Unweighted Q is lower than the always-on weight on
-2/6 and lower than the shut-off rule on
-2/6. The first-action hit rate is
-0.64 without the weight,
-0.54 with it always on, and
-0.54 with the shut-off.
-
-On relocation the \(\eta=2\) weight clears the unweighted table on
-0/6 pools, and the menu at
-\(\eta=2\) stays lower on the pools where the table was already behind.
-On the sign flip the same weight moves the median from
-7.4 to 14.1, and the
-first-action hit rate moves from 0.64 to
-0.54. The zero-policy shut-off does not fire
-once the ramp has crossed one half. On the flip it fires on a few earlier
-rounds, and the post-shift excess stays within a point of the always-on
-weight (14.1 against
-14.1).
 The share names which reference score has stopped explaining the outcome.
-Once a cell has a value, that name is not the button to press. The menu
-keeps the relocation index it already has. The visit-bonus table keeps the
-sign flip without this weight.
+Once a cell has a value, that name is not the button. Relocation stays with
+the menu at \(\eta=2\). The sign flip stays with visit-bonus Q, and this
+weight stays off that table.
 
 \input{weight_table.tex}
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=0.92\textwidth]{weight_bars.png}
-\caption{Median post-shift excess. The menu at \(\eta=2\) is marked in green.
-QW1 and QW2 put the share on the action index. QW2-Z turns that weight off
-when the zero policy holds the share.}
+\caption{Median post-shift excess across six pools. The menu at \(\eta=2\)
+is marked in green. QW1 and QW2 subtract the share gap from the visit-bonus
+index. QW2-Z uses the same index and sets the weight to zero on a round
+whose largest share is the zero policy.}
 \end{figure}
 \end{document}

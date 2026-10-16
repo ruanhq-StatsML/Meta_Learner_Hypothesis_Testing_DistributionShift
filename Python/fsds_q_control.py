@@ -1,16 +1,12 @@
 """Short-horizon control under a gradual reward drift.
 
-The previous Q rules were stateless indexes on a menu of scorecards. Here the
-decision is an action in {-1, 0, +1} at each of four steps. The observable
-state is the three-way sign of two known reference scores and the step
-index. A second table also sees which reference policy currently holds the
-pseudo-outcome share. That share is the same construction as the scorecard
-race: every reference policy is scored on the batch, and the weight is
-refreshed on the fixed calendar.
-
-The committed menu (block A, block B or the flipped sign, a blend, and the
-zero action) is the baseline. UCB and UCB at eta=2 still pick one policy for
-the whole episode. They do not condition on the current signs.
+Each round is an episode of four steps. The action is in {-1, 0, +1}. The
+tabular state is the three-way sign of two known reference scores and the
+step index. A visit bonus explores unvisited cells. The FSDS share, refreshed
+on the scorecard calendar, can also enter as an action penalty: the gap
+between those two shares, charged only when they prescribe different actions.
+The committed menu is the baseline. UCB at eta=2 picks one reference policy
+for the whole episode.
 """
 
 from __future__ import annotations
@@ -146,7 +142,6 @@ def prepare(Xpool, kind, seed):
     rng = np.random.default_rng(seed)
     d = Xpool.shape[1]
     policies, block_a, block_b = _betas(d, kind)
-    parts = _parts(d)
     v = np.ones(d) / np.sqrt(d)
     noise = rng.normal(scale=NOISE, size=(ROUNDS, H, EP))
     s0 = np.zeros((ROUNDS, EP, d))
@@ -188,14 +183,12 @@ def prepare(Xpool, kind, seed):
         wbin[t:] = int(np.argmax(current)) + 1
     ref = noisy_mean[:REF_BATCHES].ravel()
     sigma = float(np.std(ref, ddof=1))
-    opt_step = float(np.quantile(np.abs(s0[0] @ block_a), 0.9))
     zero_arm = int(np.argmin([float(np.linalg.norm(coef)) for coef in policies]))
     return {
         "kind": kind,
         "s0": s0,
         "beta": beta,
         "v": v,
-        "parts": parts,
         "noise": noise,
         "alpha": alpha,
         "post": post,
@@ -207,7 +200,6 @@ def prepare(Xpool, kind, seed):
         "shares": shares,
         "wbin": wbin,
         "sigma": max(sigma, 1e-6),
-        "opt_step": max(opt_step, 0.5),
         "policies": policies,
         "zero_arm": zero_arm,
     }
