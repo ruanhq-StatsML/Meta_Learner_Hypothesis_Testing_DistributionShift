@@ -189,6 +189,7 @@ def prepare(Xpool, kind, seed):
     ref = noisy_mean[:REF_BATCHES].ravel()
     sigma = float(np.std(ref, ddof=1))
     opt_step = float(np.quantile(np.abs(s0[0] @ block_a), 0.9))
+    zero_arm = int(np.argmin([float(np.linalg.norm(coef)) for coef in policies]))
     return {
         "kind": kind,
         "s0": s0,
@@ -208,7 +209,33 @@ def prepare(Xpool, kind, seed):
         "sigma": max(sigma, 1e-6),
         "opt_step": max(opt_step, 0.5),
         "policies": policies,
+        "zero_arm": zero_arm,
     }
+
+
+def _contrast_penalty(state, policies, shares):
+    """Penalty on the action of the higher-share directional score.
+
+    The two directional scores are policies 0 and 1. The penalty is their
+    share gap, and it is applied only where those two scores prescribe
+    different actions. Equal shares, or agreement on the action, leave the
+    index untouched. The zero policy is not a direction.
+    """
+    penalty = np.zeros((state.shape[0], N_A))
+    gap = float(shares[0] - shares[1])
+    if abs(gap) < 1e-8:
+        return penalty
+    primary = policies[0] if gap > 0.0 else policies[1]
+    other = policies[1] if gap > 0.0 else policies[0]
+    magnitude = abs(gap)
+    stale = _act_from_score(state @ primary)
+    live = _act_from_score(state @ other)
+    differ = stale != live
+    if not np.any(differ):
+        return penalty
+    rows = np.arange(state.shape[0])[differ]
+    penalty[rows, (stale[differ] + 1).astype(int)] = magnitude
+    return penalty
 
 
 def _bucket(pack, t, excess, hit, boxes):
@@ -282,6 +309,8 @@ def run_q(pack, policy, seed):
     use_share = bool(policy["share"])
     kind = policy["qrule"]
     alpha_q = float(policy["alpha"])
+    eta = float(policy.get("eta", 0.0))
+    shut_zero = bool(policy.get("shut_zero", False))
     Q, Q2, counts = _q_tables()
     boxes = _fresh()
     v = pack["v"]
@@ -290,6 +319,10 @@ def run_q(pack, policy, seed):
     for t in range(ROUNDS):
         beta = pack["beta"][t]
         wbin = int(pack["wbin"][t]) if use_share else 0
+        shares_t = pack["shares"][t]
+        lam_t = eta * pack["sigma"]
+        if shut_zero and int(np.argmax(shares_t)) == int(pack["zero_arm"]):
+            lam_t = 0.0
         state = pack["s0"][t].copy()
         achieved = np.zeros(state.shape[0])
         first_hit = None
@@ -304,6 +337,11 @@ def run_q(pack, policy, seed):
                 bonus = np.sqrt(2.0 * np.log(t + 1.0) / np.maximum(seen, 1.0))
                 bonus = np.where(seen > 0.0, bonus, 1e3)
                 value = value + bonus
+            if lam_t > 0.0:
+                # Remaining-horizon fraction keeps one episode-level penalty from
+                # being charged in full at every step. The backup below stays raw.
+                remain = (H - h) / float(H)
+                value = value - lam_t * remain * _contrast_penalty(state, pack["policies"], shares_t)
             jitter = rng.uniform(0.0, 1e-6, size=value.shape)
             a_idx = np.argmax(value + jitter, axis=1)
             action = ACTIONS[a_idx]
