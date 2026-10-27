@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local/federated-vimp/site-upload.schema.json",
+  "title": "SiteUpload",
+  "description": "Per-site packet for aggregated OOD VIMP. Vectors are conditional-association scores on feature indices, not causal effects and not a site's share of a fleet effect. vimp_cov and vimp_con stay separate; they are never collapsed into one scalar.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "site_id",
+    "vimp_cov",
+    "vimp_con",
+    "z_mmd",
+    "z_r",
+    "calibration_ok",
+    "D_k",
+    "D_k_ci",
+    "n_k",
+    "feature_mask"
+  ],
+  "properties": {
+    "site_id": {"type": "string", "minLength": 1},
+    "vimp_cov": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "number"},
+      "description": "Simplex average of MMD-LOCO, HSIC-LOCO, and domain-classifier permutation VIMP."
+    },
+    "vimp_con": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "number"},
+      "description": "Simplex average of PO-risk LOCO, R-risk LOCO, and DR-split VIMP."
+    },
+    "z_mmd": {"type": "number"},
+    "z_r": {"type": "number"},
+    "calibration_ok": {"type": "boolean"},
+    "D_k": {
+      "type": "number",
+      "description": "Site dominance score in [-1, 1]. Positive leans concept, negative leans covariate. Not a share of the fleet."
+    },
+    "D_k_ci": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "number"}
+    },
+    "n_k": {"type": "integer", "minimum": 0},
+    "feature_mask": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "boolean"},
+      "description": "True where this site observes the feature. Indices only; names are not uploaded."
+    },
+    "diagnostics": {
+      "type": "object",
+      "description": "Optional server-side echoes. Not required to pool the core packet.",
+      "additionalProperties": true
+    }
+  }
+}
